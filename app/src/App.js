@@ -2,12 +2,59 @@ import { ethers } from 'ethers';
 import { useEffect, useState } from 'react';
 import deploy from './deploy';
 import Escrow from './Escrow';
+import EscrowArtifact from './artifacts/contracts/Escrow.sol/Escrow';
 
 const provider = new ethers.providers.Web3Provider(window.ethereum);
 
 export async function approve(escrowContract, signer) {
   const approveTxn = await escrowContract.connect(signer).approve();
   await approveTxn.wait();
+}
+
+// Helper function to create escrow object with on-demand blockchain connectivity
+function createEscrowObject(contractData, signer = null) {
+  return {
+    address: contractData.address,
+    arbiter: contractData.arbiter,
+    beneficiary: contractData.beneficiary,
+    value: contractData.value,
+    isApproved: contractData.isApproved || false,
+    handleApprove: async () => {
+      // Don't allow approval if already approved
+      if (contractData.isApproved) {
+        console.log('Contract already approved');
+        return;
+      }
+
+      // Get signer on-demand if not provided
+      const currentSigner = signer || provider.getSigner();
+      
+      // Create contract instance when needed
+      const escrowContract = new ethers.Contract(
+        contractData.address,
+        EscrowArtifact.abi,
+        currentSigner
+      );
+
+      escrowContract.on('Approved', async () => {
+        // Update UI immediately
+        document.getElementById(contractData.address).className = 'complete';
+        document.getElementById(contractData.address).innerText = "✓ It's been approved!";
+        
+        // Update server with approval status
+        try {
+          await fetch(`http://localhost:3001/contracts/${contractData.address}/approve`, {
+            method: 'PUT',
+          });
+          console.log('Contract approval status updated on server');
+        } catch (error) {
+          console.error('Failed to update approval status on server:', error);
+        }
+      });
+
+      await approve(escrowContract, currentSigner);
+    },
+  };
 }
 
 function App() {
@@ -26,33 +73,70 @@ function App() {
     getAccounts();
   }, [account]);
 
+  //load existing contracts from server
+  useEffect(() => {
+    async function loadContracts() {
+      try {
+        const response = await fetch('http://localhost:3001/contracts');
+        if (!response.ok) {
+          console.error('Failed to load contracts from server');
+          return;
+        }
+        const contracts = await response.json();
+        console.log('Loaded contracts from server:', contracts);
+        
+        // Convert to escrow objects with on-demand blockchain connectivity
+        setEscrows(contracts.map(contract => createEscrowObject({
+          ...contract,
+          isApproved: contract.isApproved || false // Default to false for existing contracts
+        })));
+      } catch (error) {
+        console.error('Error loading contracts:', error);
+      }
+    }
+
+    loadContracts();
+  }, []);
+
   async function newContract() {
     const beneficiary = document.getElementById('beneficiary').value;
     const arbiter = document.getElementById('arbiter').value;
-    const value = document.getElementById('amount').value;
+    let value = document.getElementById('amount').value;
     const type = document.getElementById('type').value;
     if (type === 'ether') {
       value = ethers.utils.parseEther(value);
     }
     const escrowContract = await deploy(signer, arbiter, beneficiary, value);
 
-
-    const escrow = {
+    // put the contract into server, server is implemented in server/index.js with express port is 3001
+    const response = await fetch('http://localhost:3001/contracts', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        address: escrowContract.address,
+        arbiter,
+        beneficiary,
+        value: value.toString(),
+        isApproved: false, // New contracts start as not approved
+      }),
+    });
+    if (!response.ok) {
+      console.error('Failed to save contract to server');
+      return;
+    }
+    const data = await response.json();
+    console.log('Contract saved to server:', data);
+    
+    // Create escrow object - signer is passed for new contracts
+    const escrow = createEscrowObject({
       address: escrowContract.address,
       arbiter,
       beneficiary,
       value: value.toString(),
-      handleApprove: async () => {
-        escrowContract.on('Approved', () => {
-          document.getElementById(escrowContract.address).className =
-            'complete';
-          document.getElementById(escrowContract.address).innerText =
-            "✓ It's been approved!";
-        });
-
-        await approve(escrowContract, signer);
-      },
-    };
+      isApproved: false, // New contracts start as not approved
+    }, signer);
 
     setEscrows([...escrows, escrow]);
   }

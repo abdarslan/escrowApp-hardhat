@@ -1,0 +1,16 @@
+[
+  {
+    "address": "0x8e4763E76c106C699903796818AA786d687f9fA3",
+    "arbiter": "0xdD2FD4581271e230360230F9337D5c0430Bf44C0",
+    "beneficiary": "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199",
+    "value": "500000000000000000000",
+    "isApproved": true
+  },
+  {
+    "address": "0x601d086ee8F66192523F6D47dA9E453daA75Bb9e",
+    "arbiter": "0xdD2FD4581271e230360230F9337D5c0430Bf44C0",
+    "beneficiary": "0x8626f6940E2eb28930eFb4CeF49B2d1F2C9C1199",
+    "value": "500000000000000000000",
+    "isApproved": false
+  }
+]
