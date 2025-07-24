@@ -2,7 +2,6 @@ const express = require('express');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
-const { createContext } = require('vm');
 
 const app = express();
 app.use(cors());
@@ -44,8 +43,9 @@ app.put('/contracts/:address/approve', (req, res) => {
     if (contractIndex === -1) {
         return res.status(404).json({ error: 'Contract not found' });
     }
-    
     contracts[contractIndex].isApproved = true;
+    contracts[contractIndex].approvedAt = Math.floor(Date.now() / 1000); // Current time in seconds
+    
     saveContracts(contracts);
     res.json(contracts[contractIndex]);
 });

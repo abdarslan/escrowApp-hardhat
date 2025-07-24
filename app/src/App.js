@@ -10,7 +10,6 @@ export async function approve(escrowContract, signer) {
   const approveTxn = await escrowContract.connect(signer).approve();
   await approveTxn.wait();
 }
-
 // Helper function to create escrow object with on-demand blockchain connectivity
 function createEscrowObject(contractData, signer = null) {
   return {
@@ -18,6 +17,8 @@ function createEscrowObject(contractData, signer = null) {
     arbiter: contractData.arbiter,
     beneficiary: contractData.beneficiary,
     value: contractData.value,
+    startedAt: contractData.startedAt,
+    approvedAt: contractData.approvedAt,
     isApproved: contractData.isApproved || false,
     handleApprove: async () => {
       // Don't allow approval if already approved
@@ -40,7 +41,7 @@ function createEscrowObject(contractData, signer = null) {
         // Update UI immediately
         document.getElementById(contractData.address).className = 'complete';
         document.getElementById(contractData.address).innerText = "✓ It's been approved!";
-        
+        // update approvedAt as well
         // Update server with approval status
         try {
           await fetch(`http://localhost:3001/contracts/${contractData.address}/approve`, {
@@ -61,7 +62,7 @@ function App() {
   const [escrows, setEscrows] = useState([]);
   const [account, setAccount] = useState();
   const [signer, setSigner] = useState();
-
+  const [error, setError] = useState(null);
   useEffect(() => {
     async function getAccounts() {
       const accounts = await provider.send('eth_requestAccounts', []);
@@ -88,7 +89,8 @@ function App() {
         // Convert to escrow objects with on-demand blockchain connectivity
         setEscrows(contracts.map(contract => createEscrowObject({
           ...contract,
-          isApproved: contract.isApproved || false // Default to false for existing contracts
+          isApproved: contract.isApproved || false, // Default to false for existing contracts
+          approvedAt: contract.approvedAt ? contract.approvedAt : null,
         })));
       } catch (error) {
         console.error('Error loading contracts:', error);
@@ -101,8 +103,24 @@ function App() {
   async function newContract() {
     const beneficiary = document.getElementById('beneficiary').value;
     const arbiter = document.getElementById('arbiter').value;
+    let signerAddress = await provider.getSigner().getAddress();
+    // force signer, arbiter and beneficiary to be unique
+    console.log('Arbiter:', arbiter, 'Beneficiary:', beneficiary, 'Signer:', signerAddress);
+    if (arbiter === beneficiary) {
+      setError('Arbiter and Beneficiary cannot be the same address');
+      return;
+    } else if (arbiter.toLowerCase() === signerAddress.toLowerCase()) {
+      setError('Arbiter cannot be the same as the signer');
+      return;
+    } else if (signerAddress.toLowerCase() === beneficiary.toLowerCase()) {
+      setError('Beneficiary cannot be the same as the signer');
+      return;
+    }
     let value = document.getElementById('amount').value;
     const type = document.getElementById('type').value;
+    const startedAt = Math.floor(Date.now() / 1000); // Current time in seconds
+    let approvedAt = null;
+
     if (type === 'ether') {
       value = ethers.utils.parseEther(value);
     }
@@ -119,6 +137,8 @@ function App() {
         arbiter,
         beneficiary,
         value: value.toString(),
+        startedAt,
+        approvedAt,
         isApproved: false, // New contracts start as not approved
       }),
     });
@@ -135,16 +155,19 @@ function App() {
       arbiter,
       beneficiary,
       value: value.toString(),
+      startedAt,
+      approvedAt,
       isApproved: false, // New contracts start as not approved
     }, signer);
 
     setEscrows([...escrows, escrow]);
   }
-
+  
   return (
     <>
       <div className="contract">
         <h1> New Contract </h1>
+        {error && <div className="error" style={{ color: 'red' }}>{error}</div>}
         <label>
           Arbiter Address
           <input type="text" id="arbiter" />

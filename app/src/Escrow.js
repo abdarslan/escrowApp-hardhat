@@ -4,6 +4,8 @@ export default function Escrow({
   beneficiary,
   value,
   isApproved,
+  startedAt,
+  approvedAt,
   handleApprove,
 }) {
   return (
@@ -20,6 +22,14 @@ export default function Escrow({
         <li>
           <div> Value </div>
           <div> {value} </div>
+        </li>
+        <li>
+          <div> Started At </div>
+          <div> {startedAt ? new Date(startedAt * 1000).toLocaleString() : 'N/A'} </div>
+        </li>
+        <li>
+          <div> Approved At </div>
+          <div> {approvedAt ? new Date(approvedAt * 1000).toLocaleString() : 'N/A'} </div>
         </li>
         {isApproved ? (
           <div
