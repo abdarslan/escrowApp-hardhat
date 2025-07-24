@@ -29,7 +29,11 @@ function App() {
   async function newContract() {
     const beneficiary = document.getElementById('beneficiary').value;
     const arbiter = document.getElementById('arbiter').value;
-    const value = ethers.BigNumber.from(document.getElementById('wei').value);
+    const value = document.getElementById('amount').value;
+    const type = document.getElementById('type').value;
+    if (type === 'ether') {
+      value = ethers.utils.parseEther(value);
+    }
     const escrowContract = await deploy(signer, arbiter, beneficiary, value);
 
 
@@ -66,12 +70,16 @@ function App() {
           Beneficiary Address
           <input type="text" id="beneficiary" />
         </label>
-
+      <div className="amount" style={{ display: 'inline-flex'}}>
         <label>
-          Deposit Amount (in Wei)
-          <input type="text" id="wei" />
+          Deposit Amount
+          <input type="number" id="amount" style={{ width: '9.4rem', height: '1.5rem' }} />
         </label>
-
+        <select id='type' style={{ height: '2.5rem', marginTop: '1.8rem' }}>
+          <option value="wei">Wei</option>
+          <option value="ether">Ether</option>
+        </select>
+      </div>
         <div
           className="button"
           id="deploy"
